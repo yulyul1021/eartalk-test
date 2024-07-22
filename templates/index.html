@@ -98,6 +98,7 @@
                     <button type="submit">변환</button>
                     {% if data %}
                         <button type="button" onclick="copyText()">복사</button>
+                    <!-- TODO audio.py 수정 후 아래 path=data.processed 로 변경-->
                         <button type="button" onclick="playAudio('{{ url_for('audio_files', path=data.original) }}')">재생</button>
                     {% endif %}
                 </form>
