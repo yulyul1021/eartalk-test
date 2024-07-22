@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>폼과 녹음</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .phone-container {
+            width: 375px; /* Typical phone width */
+            height: 667px; /* Typical phone height */
+            background: white;
+            border-radius: 30px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .top-section, .bottom-section {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+        .top-section {
+            background-color: #f0f0f0;
+            padding: 20px;
+            box-sizing: border-box;
+            flex: 2; /* Increased flex value */
+        }
+        .bottom-section {
+            background-color: #00C49A;
+            flex: 1; /* Reduced flex value */
+            justify-content: center;
+        }
+        .text-input {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+        }
+        .text-input textarea {
+            width: 100%;
+            height: 100%; /* Height adjusted to leave space for button */
+            padding: 20px;
+            font-size: 20px; /* Increased font size */
+            border: none; /* Removed border */
+            resize: none;
+            box-sizing: border-box;
+            background-color: #f0f0f0;
+        }
+        .text-input button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 20px;
+            background-color: #00C49A;
+            color: white;
+        }
+        .record-button {
+            background-color: #00C49A;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 100px;
+            height: 100px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 48px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-container">
+        <div class="top-section">
+            <div class="text-input">
+                <form action="/" method="post" id="textForm" enctype="multipart/form-data">
+                    <textarea id="textInput" name="input_text" required placeholder="여기에 텍스트를 입력하거나, 아래 버튼을 눌러 녹음을 시작하세요.">{{ data.text if data else "" }}</textarea>
+                    <button type="submit">변환</button>
+                    {% if data %}
+                        <button type="button" onclick="copyText()">복사</button>
+                        <button type="button" onclick="playAudio('{{ url_for('audio_files', path=data.original) }}')">재생</button>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+        <div class="bottom-section">
+            <button id="recordButton" class="record-button">🎤</button>
+            <button id="stopButton" class="record-button hidden">⬛️</button>
+        </div>
+    </div>
+
+    <!-- Hidden form for file upload -->
+    <form id="uploadForm" action="/" method="post" enctype="multipart/form-data" class="hidden">
+        <input type="file" id="audioFile" name="audio" accept="audio/wav">
+        <button type="submit" id="uploadButton">업로드</button>
+    </form>
+
+    <script src="/static/recorder.js"></script>
+    <script>
+        URL = window.URL || window.webkitURL;
+
+        var gumStream;              //stream from getUserMedia()
+        var rec;                    //Recorder.js object
+        var input;                  //MediaStreamAudioSourceNode we'll be recording
+
+        var AudioContext = window.AudioContext || window.webkitAudioContext;
+        var audioContext;
+
+        var recordButton = document.getElementById("recordButton");
+        var stopButton = document.getElementById("stopButton");
+
+        recordButton.addEventListener("click", startRecording);
+        stopButton.addEventListener("click", stopRecording);
+
+        function startRecording() {
+            console.log("recordButton clicked");
+
+            recordButton.classList.add('hidden');
+            stopButton.classList.remove('hidden');
+
+            navigator.mediaDevices.getUserMedia({audio: true, video: false}).then(function(stream) {
+                console.log("getUserMedia() success, stream created, initializing Recorder.js ...");
+
+                audioContext = new AudioContext({sampleRate: 16000});
+
+                gumStream = stream;
+
+                input = audioContext.createMediaStreamSource(stream);
+
+                rec = new Recorder(input, {numChannels: 1})
+
+                rec.record()
+
+                console.log("Recording started");
+
+            }).catch(function(err) {
+                recordButton.classList.remove('hidden');
+                stopButton.classList.add('hidden');
+            });
+        }
+
+        function stopRecording() {
+            console.log("stopButton clicked");
+
+            stopButton.classList.add('hidden');
+            recordButton.classList.remove('hidden');
+
+            rec.stop();
+            gumStream.getAudioTracks()[0].stop();
+
+            rec.exportWAV(sendToServer);
+        }
+
+        function sendToServer(blob) {
+            var fileInput = document.getElementById("audioFile");
+            var uploadForm = document.getElementById("uploadForm");
+
+            var file = new File([blob], "recording.wav", {type: "audio/wav"});
+            var dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            fileInput.files = dataTransfer.files;
+
+            uploadForm.submit();
+        }
+
+        function copyText() {
+            var textInput = document.getElementById("textInput");
+            textInput.select();
+            textInput.setSelectionRange(0, 99999); /* For mobile devices */
+            navigator.clipboard.writeText(textInput.value);
+            alert("텍스트가 복사되었습니다.");
+        }
+
+        function playAudio(url) {
+            var audio = new Audio(url);
+            audio.play();
+        }
+    </script>
+</body>
+</html>
